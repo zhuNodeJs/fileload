@@ -5,7 +5,7 @@
   </div>
 </template>
 <script>
- const SIZE = 10 * 1024 * 1024; // 切片大小
+ const SIZE = 10 * 1024; // 切片大小
  export default {
    name: 'FileLoad',
    data() {
@@ -39,11 +39,11 @@
       })
     },
     handleFileChange(e) {
-      console.log(e)
+      // console.log(e)
       const [file] = e.target.files;
       if (!file) return;
       Object.assign(this.$data, this.$options.data())
-      console.log('*********', this.$data)
+      // console.log('*********', this.$data)
 
       this.container.file = file;
     },
@@ -68,16 +68,19 @@
         formData.append('filename', this.container.file.name)
         return {formData}
       })
-      .map(async ({formData}) => {
-        this.request({
-          url: 'http://localhost:3000',
+      .map(({formData}) => {
+        return this.request({
+          url: 'http://localhost:3000/',
           data: formData
+        }).then(res=> {
+          console.log(res)
+          return res;
         })
       })
-
-      await Promise.all(requestList)
-      // 合并切片
-      await this.mergeRequest()
+      
+      await Promise.all(requestList);     
+      // // 合并切片请求
+      await this.mergeRequest();
     },
     async mergeRequest() {
       await this.request({
