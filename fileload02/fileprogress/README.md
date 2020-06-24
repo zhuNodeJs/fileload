@@ -1,4 +1,4 @@
-# fileload
+# fileprogress
 
 > A Vue.js project
 
@@ -19,7 +19,3 @@ npm run build --report
 ```
 
 For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
-
-# fileload01用来实现基本的文件的上传
-# fileload02实现进度条的实现
- queue a task to fire a progress event named progress at the XMLHttpRequestUpload object about every 50ms or for every byte transmitted, whichever is least frequent. - W3 XMLHttpRequest Level 2 (Bolded for emphasis)
