@@ -84,7 +84,7 @@ class Controller {
       await fse.move(chunk.path, path.resolve(chunkDir, hash))
       res.end('received file chunk')
     })
-
+    
   
   }
 }

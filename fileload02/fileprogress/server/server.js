@@ -1,6 +1,7 @@
 const Controller = require('./controller')
 const http = require('http')
 const server = http.createServer()
+const spark = require('./files/spark-md5.min.js');
 
 const controller = new Controller()
 
@@ -23,6 +24,14 @@ server.on('request', async(req, res) => {
         console.log('1')
         await controller.handleFormData(req, res)
     }
+
+    if (req.url === '/spark') {
+        res.end(spark)
+    }
+
+    // if (req.url === '/worker') {
+
+    // }
 })
 
-server.listen(3000, () => console.log('正在监听3000端口'))
+server.listen(3009, () => console.log('正在监听3009端口'))
