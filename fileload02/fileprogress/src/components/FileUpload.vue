@@ -106,9 +106,19 @@
         })
         xhr.send(data)
         xhr.onload = e => {
+          // 将请求成功的xhr从列表中删除
+          if(requestList) {
+            const xhrIndex = requestList.findIndex(item => item === xhr)
+            requestList.splice(xhrIndex, 1)
+          }
           resolve({
             data: e.target.response
           })
+        }
+
+        // 暴露当前xhr给外部, 总是把最新的请求对象放入到数组中;
+        if (requestList) {
+          requestList.push(xhr)
         }
       })
     },
@@ -133,14 +143,16 @@
       return fileChunkList
     },
     // 上传切片
-    async uploadChuncks() {
+    async uploadChuncks(uploadedList = []) {
       const requestList = this.data
+      .filter(({hash}) => !uploadedList.includes(hash))
       .map(({chunk, hash, index})=> {
         const formData = new FormData();
         formData.append('chunk', chunk)
         formData.append('hash', hash)
         formData.append('filename', this.container.file.name)
-        return {formData, index}
+        formData.append('fileHash', this.container.hash)
+        return {formData, index} // -----
       })
       .map(({formData, index}) => {
         return this.request({
@@ -172,9 +184,16 @@
     calculateHash(fileChunkList) {
       return new Promise((resolve, reject) => {  
         if(window.Worker) {
-          this.container.worker = new Worker('/api/files/hash.js'); // 创建一个worker实例，并赋值到data实现响应式
+          this.container.worker = new Worker('/api/hash.js'); // 创建一个worker实例，并赋值到data实现响应式
           this.container.worker.postMessage({fileChunkList})
-
+          this.container.worker.onmessage = e => {
+            console.log('>>>>>>', e.data)
+            const {percentage, hash} = e.data;
+            this.hashPercentage = percentage;
+            if (hash) { // 如果hash有值，则表示hash计算完成
+              resolve(hash)
+            }
+          }
         }
       })
     },
@@ -184,17 +203,44 @@
       const _that = this;
       const fileChunkList = _that.createFileChunk(this.container.file)
       this.container.hash = await this.calculateHash(fileChunkList)
+
+      const {shouldUpload, uploadedList} = await this.verifyUpload(
+        this.container.file.name,
+        this.container.hash
+      );
+
+      if (!shouldUpload) {
+        this.$message.success('妙传: 上传成功');
+        this.status = Status.wait;
+        return;
+      }
+
       this.data = fileChunkList.map(({file}, index) => {
         return {
+          fileHash: this.container.hash,
           chunk: file,
           index, // 初始化索引和进度值
-          hash: _that.container.file.name + '-' + index, // 文件名 + 数组下标
-          percentage: 0,
-          size: file.size
+          hash: _that.container.hash + '-' + index, // 文件名 + 数组下标
+          size: file.size,
+          percentage: uploadedList.includes(index) ? 100 : 0
         }
       })
 
-      await _that.uploadChuncks();
+      await _that.uploadChuncks(uploadedList); 
+    },
+    async verifyUpload(filename, fileHash) {
+      const {data} = await this.request({
+        url: 'http://localhost:3009/verify',
+        headers: {
+          'content-type': 'application/json'
+        },
+        data: JSON.stringify({
+          filename,
+          fileHash
+        })
+      })
+
+      return JSON.parse(data)
     },
     createProgressHandler(item) { // 网络300ms以下的话才会有效果
       return e => {

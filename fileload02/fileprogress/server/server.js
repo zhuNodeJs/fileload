@@ -1,7 +1,6 @@
 const Controller = require('./controller')
 const http = require('http')
 const server = http.createServer()
-const spark = require('./files/spark-md5.min.js');
 
 const controller = new Controller()
 
@@ -23,15 +22,14 @@ server.on('request', async(req, res) => {
     if (req.url === '/') {
         console.log('1')
         await controller.handleFormData(req, res)
+        return;
     }
 
-    if (req.url === '/spark') {
-        res.end(spark)
+    if (req.url === '/verify') { // 判断文件是否存在
+       await controller.handleVerifyUpload(req, res)
+       return;
     }
 
-    // if (req.url === '/worker') {
-
-    // }
 })
 
 server.listen(3009, () => console.log('正在监听3009端口'))

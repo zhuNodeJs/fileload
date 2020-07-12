@@ -83,10 +83,36 @@ class Controller {
       // fs-extra 的rename方法类似windows平台会有权限问题
       await fse.move(chunk.path, path.resolve(chunkDir, hash))
       res.end('received file chunk')
-    })
-    
-  
+    })  
   }
+  // 判断是否存在/文件是否已上传/已上传切片下标
+  async handleVerifyUpload(req, res) {
+    const data = await resolvePost(req)
+    const {filename, fileHash} = data;
+    const ext = extractExt(filename)
+    const filePath = path.resolve(UPLOAD_DIR,`${fileHash}${ext}`);
+    if (fse.existsSync(filePath)) {
+      res.end(
+        JSON.stringify({
+          shouldUpload: false
+        })
+      )
+    } else {
+      res.end(
+        JSON.stringify({
+          shouldUpload: true,
+          uploadedList: await createUploadedList(fileHash)
+        })
+      )
+    }
+  }
+}
+
+// 返回已经上传切片名
+const createUploadedList = async fileHash => {
+  return fse.existsSync(path.resolve(UPLOAD_DIR, fileHash))
+         ? await fse.readdir(path.resolve(UPLOAD_DIR, fileHash))
+         : [];
 }
 
 module.exports = Controller
