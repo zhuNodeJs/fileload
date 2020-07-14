@@ -1,8 +1,15 @@
 <template>
   <div class="fileload">
     <div>
-        <input type="file" @change='handleFileChange' />
-        <el-button @click='handleUpload'>上传</el-button>
+        <input type="file" @change='handleFileChange' 
+         :disabled='status !== Status.wait' />
+        <el-button @click='handleUpload' :disabled="uploadDisabled">上传</el-button>
+        <el-button @click="handleResume" v-if="status === Status.pause">
+          恢复
+        </el-button>
+        <el-button v-else :disabled="status !== Status.uploading || !container.hash">
+          暂停
+        </el-button>
     </div>
     <div>
       <div>计算文件hash</div>
@@ -67,7 +74,17 @@
         fakeUploadPercentage: 0
      }
    },
+   watch: {
+     uploadPercentage(now) {
+       if (now > this.fakeUploadPercentage) {
+         this.fakeUploadPercentage = now;
+       }
+     }
+   },
    computed: {
+     uploadDisabled() {
+       return !this.container.file || [Status.pause, Status.uploading].includes(this.status)
+     },
       uploadPercentage() {
         if (!this.container.file || !this.data.length) return 0;
         const loaded = this.data
@@ -78,7 +95,7 @@
       }
    },
    methods: {
-    resetData() {
+    resetData() { // 重置所有的数据
       this.requestList.forEach((xhr, index) => {
         if(xhr.abort) {
           xhr.abort();
@@ -88,6 +105,14 @@
       if (this.container.worker) {
         this.container.worker.onmessage = null;
       }
+    },
+    async handleResume() {
+      this.status = Status.uploading;
+      const {uploadedList} = await this.verifyUpload(
+        this.container.file.name,
+        this.container.hash
+      )
+      await this.uploadChuncks(uploadedList)
     },
     request({
       url,
@@ -145,14 +170,14 @@
     // 上传切片
     async uploadChuncks(uploadedList = []) {
       const requestList = this.data
-      .filter(({hash}) => !uploadedList.includes(hash))
+      .filter(({hash}) => !uploadedList.includes(hash)) // 文件不存在时返回的时false, 取反为true时表示服务器无，需上传
       .map(({chunk, hash, index})=> {
         const formData = new FormData();
         formData.append('chunk', chunk)
         formData.append('hash', hash)
         formData.append('filename', this.container.file.name)
         formData.append('fileHash', this.container.hash)
-        return {formData, index} // -----
+        return {formData, index}
       })
       .map(({formData, index}) => {
         return this.request({
@@ -160,14 +185,16 @@
           data: formData,
           onProgress: this.createProgressHandler(this.data[index])
         }).then(res=> {
-          // console.log(res)
           return res;
         })
       })
-      
-      await Promise.all(requestList); 
+
+      await Promise.all(requestList);
+      // 之前上传的切片数量 + 本次的上传的切片数量 = 所有的切片数量 
       // 合并切片请求
-      await this.mergeRequest();
+      if (uploadedList.length + requestList.length === this.data.length) {
+        await this.mergeRequest();
+      }
     },
     async mergeRequest() {
       await this.request({
@@ -176,10 +203,14 @@
           "content-type": 'application/json'
         },
         data: JSON.stringify({
-          filename: this.container.file.name,
-          size: SIZE
+          size: SIZE, // 文件大小
+          filename: this.container.file.name, // 文件名
+          fileHash: this.container.hash // 文件的hash值
         })
       })
+
+      this.$message.success('上传成功')
+      this.status = Status.wait
     },
     calculateHash(fileChunkList) {
       return new Promise((resolve, reject) => {  
@@ -201,9 +232,12 @@
       if (!this.container.file) return; // 点击上传
       this.status = Status.uploading;
       const _that = this;
-      const fileChunkList = _that.createFileChunk(this.container.file)
-      this.container.hash = await this.calculateHash(fileChunkList)
+      const fileChunkList = _that.createFileChunk(this.container.file) // 分片
+      this.container.hash = await this.calculateHash(fileChunkList) // 计算hash,整个文件的hash
 
+      /**
+       * uploadedList 接口返回的文件列表, 是一个数组
+       */
       const {shouldUpload, uploadedList} = await this.verifyUpload(
         this.container.file.name,
         this.container.hash
