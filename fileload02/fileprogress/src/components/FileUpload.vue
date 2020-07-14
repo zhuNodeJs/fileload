@@ -145,6 +145,7 @@
         if (requestList) {
           requestList.push(xhr)
         }
+        
       })
     },
     handleFileChange(e) {
@@ -184,9 +185,10 @@
           url: 'http://localhost:3009/',
           data: formData,
           onProgress: this.createProgressHandler(this.data[index])
-        }).then(res=> {
-          return res;
         })
+        // .then(res=> {
+        //   return res;
+        // })
       })
 
       await Promise.all(requestList);
